@@ -1,0 +1,95 @@
+---
+title: "Same job, very different paycheck: what developers earn in the Switzerland, Spain and Brazil"  
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    execute:
+    echo: false
+    warning: false
+    message: false
+---
+
+```{r}
+library(tidyverse)
+library(plotly)
+library(scales)
+
+df_all <- read_csv("so_developers_2024.csv") |>
+filter(country %in% c("Spain", "Brazil", "Switzerland"))
+
+df <- df_all |>
+filter(!is.na(salary_usd)) |>
+mutate(salary_k = salary_usd / 1000)
+
+sal <- df |>
+group_by(country) |>
+summarise(n = n(), mean_k = mean(salary_k), median_k = median(salary_k)) |>
+arrange(desc(mean_k))
+
+ch <- sal$mean_k[sal$country == "Switzerland"]
+es <- sal$mean_k[sal$country == "Spain"]
+br <- sal$mean_k[sal$country == "Brazil"]
+
+exp_means <- df |> filter(!is.na(years_code_pro)) |>
+group_by(country) |> summarise(m = mean(years_code_pro))
+
+```
+
+### Thinking about working as a developer in Switzerland, Spain or Brazil? Here's what developers reported in 2024.
+
+```{r}
+sal$country <- factor(sal$country, levels = sal$country)
+sal$label <- paste0(sal$country, "<br>Average: $", round(sal$mean_k, 1), "k", "<br>Developers: ", sal$n)
+
+p_hero <- ggplot(sal, aes(x = country, y = mean_k, fill = country, text = label)) +
+geom_col(show.legend = FALSE) +
+labs(title = paste0("Swiss developers report about 2x the average salary of Spanish developers"),
+x = "Country", y = "Average annual salary (thousands of USD)") +
+theme_minimal()
+
+ggsave("hero_chart.png", p_hero, width = 8, height = 5, dpi = 300)
+ggplotly(p_hero)
+```
+
+### What is the AI usage for Switzerland, Spain and Brazil?
+
+```{r}
+p2 <- df_all |>
+filter(!is.na(ai_select)) |>
+count(country, ai_select) |>
+group_by(country) |>
+mutate(pct = n / sum(n),label = paste0(country, "<br>", ai_select, ": ", percent(pct, 0.1))) |>
+
+ggplot(aes(x = country, y = pct, fill = ai_select, text = label)) +
+geom_col() +
+scale_y_continuous(labels = percent) +
+labs(title = "Share of developers who use AI tools, by country",x = "Country", y = "Share of respondents (%)", fill = "Uses AI tools?") +
+theme_minimal()
+
+ggplotly(p2)
+
+```
+
+This chart shows the usage of AI in each country, based on the survey answers that were provided. I did not apply a test for this specific feature.
+
+### Findings and why it matters
+
+Salary differs a lot between Spain, Brazil and Switzerland. Switzerland has the highest average salary at about $122k, followed by Spain at about $60k and Brazil at about $43k. The average experience is very similar in the three countries, between about 10 and 11 years, so the pay gap is not explained by developers in one country having more experience. Respondents chose to take the survey, so they are not a random sample of all developers. Also, salaries are in US dollars with no cost-of-living adjustment, so $43k in Brazil may go further than the number suggests. Finally, a higher average salary in a country does not mean that moving there would make me earn more, because the data show an association, not a cause.
+
+###  Can you trust these numbers? What the data shows and what it can't
+
+I used `r nrow(df)` developers who reported a salary in the Stack Overflow 2024 Developer Survey. Because salary spread differed by country, I compared averages with Welch's ANOVA and the Games–Howell post-hoc test, and used a MANOVA to check salary and experience together.
+
+**Limitations:**
+
+- Respondents chose to take the survey and reported their own pay, so they are not a random sample of all developers.
+- Salaries are in US dollars with no cost-of-living adjustment, and a country's average pay does not show that moving there would *cause* you to earn more.
+
+---
+
+
+**Created by Andreina Tejada Aguila** · [LinkedIn](https://www.linkedin.com/in/andreina-tejada-aguila-37ab15206/)
+
+Data: Stack Overflow 2024 Developer Survey (ODbL). Project for DSAN 5100, Georgetown University M.S. in Data Science & Analytics.
